@@ -41,10 +41,8 @@ class LinearRegressor:
         if np.ndim(X) == 1:
             X = X.reshape(-1, 1)
 
-        X_with_bias = np.insert(
-            X, 0, 1, axis=1
-        )  # Adding a column of ones for intercept
-
+        X_with_bias = np.c_[np.ones(X.shape[0]),X] # Añadir una columna de unos, np.c_ lo usamos para concatenar para decir si queremos a la izq o a la derecha es cambiar el orden
+        #                                  # X.shape[0], X lo concatena a la izq, X, X.shape[0] lo concatena a la derecha
         if method == "least_squares":
             self.fit_multiple(X_with_bias, y)
         elif method == "gradient_descent":
@@ -64,11 +62,10 @@ class LinearRegressor:
         Returns:
             None: Modifies the model's coefficients and intercept in-place.
         """
-        # Replace this code with the code you did in the previous laboratory session
 
-        # Store the intercept and the coefficients of the model
-        self.intercept = None
-        self.coefficients = None
+        w = np.linalg.inv(np.transpose(X) @ X) @ (np.transpose(X) @ y)
+        self.intercept = w[0]
+        self.coefficients = w[1:]
 
     def fit_gradient_descent(self, X, y, learning_rate=0.01, iterations=1000):
         """
@@ -83,27 +80,28 @@ class LinearRegressor:
         Returns:
             None: Modifies the model's coefficients and intercept in-place.
         """
-
+        
         # Initialize the parameters to very small values (close to 0)
         m = len(y)
         self.coefficients = (
             np.random.rand(X.shape[1] - 1) * 0.01
         )  # Small random numbers
-        self.intercept = np.random.rand() * 0.01
+        self.intercept = np.random.rand() * 0.01 # Pillamos los parametros a un pequeño valor
 
         # Implement gradient descent (TODO)
         for epoch in range(iterations):
-            predictions = None
+            predictions = self.predict(X[:,1:])
             error = predictions - y
 
             # TODO: Write the gradient values and the updates for the paramenters
-            gradient = None
-            self.intercept -= None
-            self.coefficients -= None
+            gradient = (learning_rate/m) * np.dot(X.T,error)
+            
+            self.intercept -= gradient[0]
+            self.coefficients -= gradient[1:]
 
             # TODO: Calculate and print the loss every 10 epochs
             if epoch % 1000 == 0:
-                mse = None
+                mse = np.sum(np.power(error,2))/m
                 print(f"Epoch {epoch}: MSE = {mse}")
 
     def predict(self, X):
@@ -120,13 +118,18 @@ class LinearRegressor:
         Raises:
             ValueError: If the model is not yet fitted.
         """
-
-        # Paste your code from last week
-
+        X = np.transpose(X)
         if self.coefficients is None or self.intercept is None:
             raise ValueError("Model is not yet fitted")
 
-        return None
+        if np.ndim(X) == 1:
+            # Predict when X is only one variable
+            predictions = X * self.coefficients + self.intercept
+        else:
+            # Predict when X is more than one variable
+            predictions = np.dot(X,self.coefficients) + self.intercept
+
+        return predictions
 
 
 def evaluate_regression(y_true, y_pred):
@@ -142,16 +145,18 @@ def evaluate_regression(y_true, y_pred):
     """
 
     # R^2 Score
-    # TODO
-    r_squared = None
-
+    RSS = np.sum(np.power(y_true-y_pred,2))
+    TSS = np.sum(np.power(y_true-np.mean(y_true),2))
+    # TODO: Calculate R^2
+    # r_squared = np.power(np.cov(y_true,y_pred,ddof=0),2) / (np.var(y_true,ddof=0) * np.var(y_pred))
+    r_squared = 1 - (RSS/TSS)
     # Root Mean Squared Error
-    # TODO
-    rmse = None
+    # TODO: Calculate RMSE
+    rmse = np.sqrt((1/len(y_true)) * np.sum(np.power(y_true-y_pred,2)))
 
     # Mean Absolute Error
-    # TODO
-    mae = None
+    # TODO: Calculate MAE
+    mae = (1/len(y_true)) * np.sum(np.abs(y_true-y_pred))
 
     return {"R2": r_squared, "RMSE": rmse, "MAE": mae}
 
@@ -172,19 +177,29 @@ def one_hot_encode(X, categorical_indices, drop_first=False):
     X_transformed = X.copy()
     for index in sorted(categorical_indices, reverse=True):
         # TODO: Extract the categorical column
-        categorical_column = None
+        categorical_column = X_transformed[:,index]
+        
 
         # TODO: Find the unique categories (works with strings)
-        unique_values = None
+        unique_values = np.unique(categorical_column)
+        
 
         # TODO: Create a one-hot encoded matrix (np.array) for the current categorical column
-        one_hot = None
-
+        one_hot = np.array([
+            [1 if categoria == val else 0 for val in unique_values] for categoria in categorical_column
+        ])     # Con esta parte obtenemos el 1 0 0                     Y aquí es para pillar 
+                #                             0 1 0                     cada categoría de las posibles
+                #                             ....          
+        
+        
         # Optionally drop the first level of one-hot encoding
         if drop_first:
             one_hot = one_hot[:, 1:]
-
         # TODO: Delete the original categorical column from X_transformed and insert new one-hot encoded columns
-        X_transformed = None
-
+        
+        X_transformed = np.delete(X_transformed,index,axis=1)
+        # print(one_hot.shape)
+        # print(X_transformed.shape)
+        X_transformed = np.insert(X_transformed,index,one_hot.T, axis=1)  
+        # Trasponemos para que coincidan filas y columnas, ya q funciona como la multiplicación. Entonces tienen que coincidir
     return X_transformed
